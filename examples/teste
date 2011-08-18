@@ -1,0 +1,316 @@
+<!DOCTYPE HTML>
+<html lang="en">
+	<head>
+		<title>three.js webgl - materials - normal map [Lee Perry-Smith]</title>
+		<meta charset="utf-8">
+		<style type="text/css">
+			body {
+				background:#fff;
+				color:#fff;
+				padding:0;
+				margin:0;
+				font-weight: bold;
+				overflow:hidden;
+			}
+
+			a {	color: #ffffff;	}
+
+			#info {
+				position: absolute;
+				top: 0px; width: 100%;
+				color: #ffffff;
+				padding: 5px;
+				font-family:Monospace;
+				font-size:13px;
+				text-align:center;
+				z-index:1000;
+			}
+
+			#oldie {
+				background:rgb(200,100,0) !important;
+				color:#fff;
+			}
+
+			#vt { display:none }
+			#vt, #vt a { color:orange; }
+			.code { }
+
+			#log { position:absolute; top:50px; text-align:left; display:block; z-index:100 }
+		</style>
+	</head>
+
+	<body>
+		<div id="zz" style="display:none; top:400px; left:400px; background:#F00; position:absolute;">dfdsfdssdffgdfkligdlsfghfdkjsglfdkjghlsdfjghdsfgsdfkljgdfkgjd
+		</div>
+		<div id="cont">
+		</div>
+		<pre id="log"></pre>
+
+		<div id="info">
+			<a href="http://github.com/mrdoob/three.js" target="_blank">three.js</a> - webgl normalmap demo.
+			<a href="http://www.ir-ltd.net/infinite-3d-head-scan-released/" target="_blank">Lee Perry-Smith</a> head.
+
+			<div id="vt">displacement mapping needs vertex textures (GPU with Shader Model 3.0)<br/>
+			on Windows use <span class="code">Chrome --use-gl=desktop</span> or Firefox 4<br/>
+			please star this <a href="http://code.google.com/p/chromium/issues/detail?id=52497">Chrome issue</a> to get ANGLE support
+			
+		</div>
+
+		
+		<script type="text/javascript" src="../build/Three.js"></script>
+
+		<script type="text/javascript" src="js/Detector.js"></script>
+		<script type="text/javascript" src="js/RequestAnimationFrame.js"></script>
+		<script type="text/javascript" src="js/ShaderZ.js"></script>
+		<script type="text/javascript" src="js/Stats.js"></script>
+
+		<script type="text/javascript">
+
+			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+
+			var statsEnabled = true;
+
+			var container, stats, loader;
+
+			var camera, scene, renderer,video,texturex;
+
+			var mesh,mesh1, zmesh, lightMesh, geometry;
+			var meshx=new Array();
+
+			var directionalLight, pointLight, ambientLight;
+			var height = window.innerHeight - 300;
+
+			var mouseX = 0;
+			var mouseY = 0;
+			var vx,vy,lastx,lasty;
+			var postprocessing = { enabled  : true };
+			var windowHalfX = window.innerWidth / 2;
+			var windowHalfY = window.innerHeight / 2;
+
+			var materials = [];
+			
+			init();
+			animate();
+
+			function init() {
+			
+				/*var imagex = new Image();
+				var texturex = new THREE.Texture( imagex, new THREE.UVMapping() );			
+				imagex.onload = function () { alert("ha!"); };
+				imagex.src = "kkk.jpg";
+				texturex.needsUpdate = true;
+				alert("ein");*/
+				vx=vy=lastx=lasty=0;
+				
+				container = document.getElementById('cont');
+				document.body.appendChild(container);
+
+				camera = new THREE.Camera( 50, window.innerWidth / window.innerHeight, 1, 1000 );
+				camera.position.z = 700;
+
+				scene = new THREE.Scene();
+
+				// LIGHTS
+				ambientLight = new THREE.AmbientLight( 0x999999 );
+				scene.addLight( ambientLight );
+				pointLight = new THREE.PointLight( 0xFFFFFF,0.000001 );
+				pointLight.position.z = 700;pointLight.position.x = 150;pointLight.position.y = 1000;
+				scene.addLight( pointLight );
+
+				loader = new THREE.JSONLoader( true );
+				document.body.appendChild( loader.statusDomElement );
+				
+				var textbeer = THREE.ImageUtils.loadTexture( "beer.jpg"  );
+				
+				//texturex.needsUpdate = true;
+				var mmm = new THREE.MeshPhongMaterial( { color: 0xFFEEBB , ambient:0xFFEEBB , map:texturex } );
+								
+				var material2 = new THREE.MeshPhongMaterial( { color: 0x776655 , opacity:0.3 , shininess :10.0 , specular :0xFFFFFF} );
+				material2.transparent = true;
+				var material = new THREE.MeshPhongMaterial( { color: 0xFFEEBB , ambient:0xFFEEBB , map:textbeer } );
+				
+				loader.load( { model: "bmodels/beer.js", callback: function( geometry ) { createScene( geometry, 100,1, material,scene ) } } );
+				loader.load( { model: "bmodels/cane.js", callback: function( geometry ) { createScene( geometry, 100,2, material2,scene ) } } );
+				
+				var plano = new THREE.Mesh( new THREE.PlaneGeometry( window.innerWidth, window.innerHeight), new THREE.MeshBasicMaterial({ color:0xffffff }) );
+				plano.position.z = - 200;
+				scene.addObject( plano );
+				
+				renderer = new THREE.WebGLRenderer({ antialias: true });
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				container.appendChild( renderer.domElement );
+			
+				scene.matrixAutoUpdate = false;
+				
+				initPostprocessing();
+				if ( statsEnabled ) {
+					stats = new Stats();
+					stats.domElement.style.position = 'absolute';
+					stats.domElement.style.top = '0px';
+					stats.domElement.style.zIndex = 100;
+					container.appendChild( stats.domElement );
+				}
+				document.addEventListener( 'mousedown', onDocumentMouseDown, false );
+				
+			}
+			function createScene( geometry, scale,t, material,scena ) {
+				geometry.computeTangents();
+				meshx[t]= THREE.SceneUtils.addMesh( scena, geometry, scale, 0, - 50, 0, 0, 0, 0, material );				
+				loader.statusDomElement.style.display = "none";
+			}			
+			function onDocumentMouseDown( event ) { 
+				event.preventDefault(); 
+				document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+				document.addEventListener( 'mouseup', onDocumentMouseUp, false );
+				document.addEventListener( 'mouseout', onDocumentMouseOut, false ); 
+				lastx = event.clientX;
+				lasty = event.clientY;	
+			}
+			function onDocumentMouseMove( event ) { 
+				vx += event.clientX - lastx; 
+				vy += event.clientY - lasty; 
+				lastx = event.clientX;
+				lasty = event.clientY;	
+				targetRotation = targetRotationOnMouseDown + ( mouseX - mouseXOnMouseDown ) * 0.02;
+			} 
+			function onDocumentMouseUp( event ) { 
+				document.removeEventListener( 'mousemove', onDocumentMouseMove, false );
+				document.removeEventListener( 'mouseup', onDocumentMouseUp, false );
+				document.removeEventListener( 'mouseout', onDocumentMouseOut, false );
+			} 
+			function onDocumentMouseOut( event ) { 
+				document.removeEventListener( 'mousemove', onDocumentMouseMove, false );
+				document.removeEventListener( 'mouseup', onDocumentMouseUp, false );
+				document.removeEventListener( 'mouseout', onDocumentMouseOut, false );
+			}
+ 
+			function animate() {
+				requestAnimationFrame( animate );
+				
+				render();
+				if ( statsEnabled ) stats.update();
+			}
+
+			function log( text ) {
+				var e = document.getElementById("log");
+				e.innerHTML = text + "<br/>" + e.innerHTML;
+			}			
+			function initPostprocessing() {
+			
+				////////////////////////////////////nova cena - brilho
+				postprocessing.scene2 = new THREE.Scene();
+				postprocessing.camera2 = new THREE.Camera( 50, window.innerWidth / window.innerHeight, 1, 1000 );
+				postprocessing.camera2.position.z = 700;var ambientLight = new THREE.AmbientLight( 0x444444 );
+				pointLight = new THREE.PointLight( 0xffffff );
+				pointLight.position.z = 600;pointLight.position.x = 200;pointLight.position.y = 50;
+				postprocessing.scene2.addLight( pointLight );
+				
+				var materiallight = new THREE.MeshPhongMaterial( { color: 0xFFF5E5 , opacity:1.0 , shininess:0.0  } );
+				var materialb = new THREE.MeshBasicMaterial( { color: 0x0000ff } );
+				loader.load( { model: "bmodels/beer.js", callback: function( geometry ) { createScene( geometry, 100,3, materialb,postprocessing.scene2 ) } } );
+				loader.load( { model: "bmodels/cane.js", callback: function( geometry ) { createScene( geometry, 100,4, materiallight,postprocessing.scene2 ) } } );
+					
+				////////////////////////////////////nova cena - beer
+				postprocessing.scene3 = new THREE.Scene();
+				postprocessing.camera3 = new THREE.Camera( 50, window.innerWidth / window.innerHeight,350, 850 );
+				postprocessing.camera3.position.z = 700;var ambientLight = new THREE.AmbientLight( 0x444444 );
+				pointLight = new THREE.PointLight( 0xffffff );
+				pointLight.position.z = 600;pointLight.position.x = 0;pointLight.position.y = 0;
+				postprocessing.scene3.addLight( pointLight );
+				var materialn = new THREE.MeshDepthMaterial( { shading:THREE.SmoothShading } );
+				
+				postprocessing.qbrit = new THREE.Mesh( new THREE.PlaneGeometry( window.innerWidth, window.innerHeight), materialn );
+				postprocessing.qbrit.position.z = - 1000;
+				postprocessing.scene3.addObject( postprocessing.qbrit );
+				loader.load( { model: "bmodels/beer.js", callback: function( geometry ) { createScene( geometry, 100,5, materialb,postprocessing.scene3 ) } } );
+				loader.load( { model: "bmodels/cane.js", callback: function( geometry ) { createScene( geometry, 100,6, materialn,postprocessing.scene3 ) } } );
+					
+				//////////////////////////////////////
+				postprocessing.scene = new THREE.Scene();	
+				postprocessing.camera = new THREE.Camera();
+				postprocessing.camera.projectionMatrix = THREE.Matrix4.makeOrtho( window.innerWidth / - 2, window.innerWidth / 2,  window.innerHeight / 2, window.innerHeight / - 2, -10000, 10000 );
+				postprocessing.camera.position.z = 600;
+				
+				var pars = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBFormat };
+				postprocessing.rtTextureDepth = new THREE.WebGLRenderTarget( window.innerWidth, height, pars );
+				postprocessing.rtTextureColor = new THREE.WebGLRenderTarget( window.innerWidth, height, pars );
+				postprocessing.rtbeer = new THREE.WebGLRenderTarget( window.innerWidth, height, pars );
+				postprocessing.preresult = new THREE.WebGLRenderTarget( window.innerWidth, height, pars );
+				postprocessing.result = new THREE.WebGLRenderTarget( window.innerWidth, height, pars );
+				
+				///////////////////////////aplicando brilho
+				
+				postprocessing.scene4 = new THREE.Scene();				
+				var bshader = ShaderZ["brilho"];
+				postprocessing.buniforms = THREE.UniformsUtils.clone( bshader.uniforms );
+				postprocessing.buniforms["tColor"].texture = postprocessing.rtTextureColor;
+				postprocessing.buniforms["tDepth"].texture = postprocessing.rtTextureDepth;
+				postprocessing.buniforms["tBeer"].texture = postprocessing.rtbeer;	
+				postprocessing.postb = new THREE.MeshShaderMaterial( {
+					uniforms: postprocessing.buniforms,
+					vertexShader: bshader.vertexShader,
+					fragmentShader: bshader.fragmentShader
+				} );			
+				postprocessing.qbri = new THREE.Mesh( new THREE.PlaneGeometry( window.innerWidth, window.innerHeight), postprocessing.postb );
+				postprocessing.qbri.position.z = - 500;
+				postprocessing.scene4.addObject( postprocessing.qbri );
+				///////////////////////////aplicando glass
+					
+				var gshader = ShaderZ["glass"];
+				
+				postprocessing.guniforms = THREE.UniformsUtils.clone( gshader.uniforms );
+				postprocessing.guniforms["tColor"].texture = postprocessing.preresult;
+				postprocessing.guniforms["tDepth"].texture = postprocessing.rtTextureDepth;
+				postprocessing.guniforms["tBeer"].texture = postprocessing.rtbeer;				
+				postprocessing.postg = new THREE.MeshShaderMaterial( {
+					uniforms: postprocessing.guniforms,
+					vertexShader: gshader.vertexShader,
+					fragmentShader: gshader.fragmentShader
+				} );
+				
+				/////mini quadro
+				postprocessing.mtemp = new THREE.MeshBasicMaterial( {	map:postprocessing.rtbeer } );
+				postprocessing.quad2 = new THREE.Mesh( new THREE.PlaneGeometry( window.innerWidth/2, window.innerHeight/2), postprocessing.postg );
+				postprocessing.quad2.position.z = - 400;
+				postprocessing.quad2.position.x = - 600;
+				postprocessing.quad2.position.y = - 200;
+				//postprocessing.quad2.rotation.z = -3.1415;
+				postprocessing.scene.addObject( postprocessing.quad2 );
+				//// fundo
+				postprocessing.qf = new THREE.Mesh( new THREE.PlaneGeometry( window.innerWidth, window.innerHeight), postprocessing.postg );
+				postprocessing.qf.position.z = - 500;
+				postprocessing.scene.addObject( postprocessing.qf );
+				
+			}
+			function render() {
+				
+				
+				if( meshx[1] ) {
+					for(var i=1;i<7;i++){
+						meshx[i].rotation.y += vx*0.0005;						
+						meshx[i].rotation.x += vy*0.0002;
+						if(meshx[i].rotation.x>0.6)meshx[i].rotation.x=0.6;
+						if(meshx[i].rotation.x<-0.6)meshx[i].rotation.x=-0.6;
+						meshx[i].rotation.z = 0.15;
+					}
+				}
+				vx*=0.95;
+				vy*=0.88;
+				if ( postprocessing.enabled ) {
+					//renderer.clear();
+					renderer.render( scene, camera, postprocessing.rtTextureColor, false );
+					renderer.render( postprocessing.scene2, postprocessing.camera2, postprocessing.rtTextureDepth, false );
+					renderer.render( postprocessing.scene3, postprocessing.camera3, postprocessing.rtbeer, false );
+					renderer.render( postprocessing.scene4, postprocessing.camera, postprocessing.preresult, false  );
+					
+					renderer.render( postprocessing.scene, postprocessing.camera  );
+					//renderer.render( scene, camera);
+				} else {
+					//renderer.clear();
+					renderer.render( scene, camera );
+				}
+			}
+		</script>
+
+	</body>
+</html>
